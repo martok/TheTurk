@@ -19,7 +19,9 @@ unit uProtocol;
 interface
 
 uses
-  SysUtils, Classes, Contnrs, IdTCPConnection, IdHTTP;
+  // Sollte sich Delphi beschweren, dass EIdNotConnected, dann ist eure Indy-
+  // Version neu genug, dass IdExceptionCore gebraucht wird ;-)
+  SysUtils, Classes, Contnrs, IdTCPConnection, {IdExceptionCore, }IdHTTP;
 
 const
   // Protokollversion, muss von Client+Server identisch sein
@@ -321,7 +323,7 @@ function FieldCoordToColRow(const Field: TFieldCoord; out Col: TColIndex; out Ro
 begin
   Result:= (Field[1] in [low(TColIndex)..high(TColIndex)]) and ((Ord(Field[2])-Ord('0')) in [low(TRowIndex)..high(TRowIndex)]);
   if Result then begin
-    Col:= Field[1];
+    Col:= TColIndex(Field[1]);
     Row:= TRowIndex(Ord(Field[2])-Ord('0'));
   end;
 end;
@@ -338,7 +340,7 @@ end;
 function ColRowToFieldCoord(const Col: TColIndex; const Row: TRowIndex): TFieldCoord;
 begin
   SetLength(Result,2);
-  Result[1]:= Col;
+  Result[1]:= AnsiChar(Col);
   Result[2]:= AnsiChar(Row + Ord('0')); 
 end;
 

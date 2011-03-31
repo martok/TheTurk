@@ -30,13 +30,7 @@ type
     ThisCol, OtherCol: TColor;
   public
     { Public-Deklarationen }
-    procedure Magic(var Msg: TMessage); message WM_USER + 100;
   end;
-
-  TScore = SmallInt;
-const
-  SCORE_MIN = -30000;
-  SCORE_MAX =  30000;
 
 type
   TUIClient = class(TNetGame)
@@ -51,19 +45,6 @@ type
     procedure NextMove; override;
     procedure AfterMove(FieldFrom: TFieldCoord; FieldTo: TFieldCoord; MovingPlayer: TField); override;
     destructor Destroy; override;
-  end;
-
-  TUIClient2WithAI = class(TUIClient)
-  public
-    class function ClientName: String; override;
-    procedure NextMove; override;
-
-    function AIGetMove(out FF,FT: TFieldCoord): TScore;
-  end;
-
-  TUIClientWithAI = class(TUIClient2WithAI)
-  public
-    class function ClientName: String; override;
   end;
 
 var
@@ -167,13 +148,6 @@ begin
   inherited;
 end;
 
-{ TUIClient2 }
-
-class function TUIClient2WithAI.ClientName: String;
-begin
-  Result:= 'MartokUIClient2';
-end;
-
 { TGameWindow }
 
 procedure TGameWindow.sgBoardDrawCell(Sender: TObject; ACol, ARow: Integer;
@@ -248,134 +222,6 @@ begin
     Action:= caNone
   else
     Action:= caFree;
-end;
-
-///
-///   AI RELATED STUFF BELOW THIS LINE
-/// ----------------------------------------------------------------------------
-
-procedure TUIClient2WithAI.NextMove;
-begin
-  inherited;
-  PostMessage(FStatusWindow.Handle,WM_USER+100,0,0);
-end;
-
-function TUIClient2WithAI.AIGetMove(out FF, FT: TFieldCoord): TScore;
-const
-  LEVEL_DEPTH=4;
-  
-  function NM_Move(Moving, Reacting: TField; ABoard: TBoard; Level: integer; Alpha, Beta: TScore;
-                   out BestF,BestT: TFieldCoord): TScore;
-  var
-    FreeOnBoard: integer;
-    function Score(ABoard: TBoard; Perspective: TField): TScore;
-    var r: TRowIndex;
-        c: TColIndex;
-        th,ot: integer;
-    const
-      w1 = 20*100;
-      w2 = 1000;
-      w3 =  900;
-    begin
-      th:= 0;
-      ot:= 0;
-      for r:= low(r) to high(r) do
-        for c:= low(c) to high(c) do begin
-          if ABoard[c,r]=Perspective then
-            inc(th)
-          else if ABoard[c,r] in [ThisPlayer,OtherPlayer] then      // a clever way to say "player, but not $perspective"
-            inc(ot);
-        end;
-      Result:= Round((th / FreeOnBoard)*w2) - Round((ot / FreeOnBoard)*w3);
-    end;
-
-
-    function TryMove(fc: TColIndex; fr: TRowIndex; tc: TColIndex; tr: TRowIndex): boolean;
-    var after: TBoard;
-        df,dt: TFieldCoord;
-        S: TScore;
-    begin
-      Result:= false;
-      if (BoardValidCoords(tc,tr)) and (ABoard[tc,tr]=Empty) then begin
-        after:= ABoard;
-        BoardMapMove(after,ColRowToFieldCoord(fc,fr),ColRowToFieldCoord(tc,tr),Moving);
-
-        S:= -NM_Move(Reacting, Moving, after, Level - 1, -beta, -alpha, df,dt);
-
-        if S > alpha then begin
-          alpha:= S;
-          BestF:= ColRowToFieldCoord(fc,fr);
-          BestT:= ColRowToFieldCoord(tc,tr);
-        end;
-        if alpha >= beta then 
-          Result:= true;
-      end;
-    end;
-
-  var r: TRowIndex;
-      c: TColIndex;
-  begin
-    FreeOnBoard:= 0;
-    for r:= low(r) to high(r) do
-      for c:= low(c) to high(c) do
-        if ABoard[c,r]<>Blocked then
-          inc(FreeOnBoard);
-
-    if Level=0 then begin
-      Result:= Score(ABoard, Moving);
-      exit;
-    end;
-
-    for r:= low(R) to high(r) do
-      for c:= low(c) to high(c) do
-        if ABoard[c,r]=Moving then begin
-          if TryMove(c,r,pred(c),r-1) or
-            TryMove(c,r,pred(c),r) or
-            TryMove(c,r,pred(c),r+1) or
-            TryMove(c,r,succ(c),r-1) or
-            TryMove(c,r,succ(c),r) or
-            TryMove(c,r,succ(c),r+1) or
-            TryMove(c,r,c,r-1) or
-            TryMove(c,r,c,r+1) or
-
-            TryMove(c,r,pred(pred(c)),r-2) or
-            TryMove(c,r,pred(pred(c)),r) or
-            TryMove(c,r,pred(pred(c)),r+2) or
-            TryMove(c,r,succ(succ(c)),r-2) or
-            TryMove(c,r,succ(succ(c)),r) or
-            TryMove(c,r,succ(succ(c)),r+2) or
-            TryMove(c,r,c,r-2) or
-            TryMove(c,r,c,r+2) then begin
-            Result:= alpha;
-            exit;
-          end;
-        end;
-    if Alpha=SCORE_MIN then           // wir konnten keinen zug machen
-//      Result:= SCORE_MIN+Random(10)   // "leap of faith"
-      Result:= Score(ABoard, Moving)  // bewerten, sollte ziemlich schlecht sein
-    else
-      Result:= Alpha;
-  end;
-
-begin
-  Result:= NM_Move(ThisPlayer, OtherPlayer, Board, LEVEL_DEPTH, SCORE_MIN, SCORE_MAX, ff, ft);
-  FStatusWindow.meLog.Lines.Add(Format(' -> %d',[Result]));
-end;
-
-procedure TGameWindow.Magic;
-var f,t: TFieldCoord;
-begin
-  TUIClient2WithAI(Gm).AIGetMove(f,t);
-  edMvFrom.Text:= f;
-  edMvTo.Text:= t;
-  Button1.Click;
-end;
-
-{ TUIClientWithAI }
-
-class function TUIClientWithAI.ClientName: String;
-begin
-  Result:= 'MartokUIClient';
 end;
 
 end.

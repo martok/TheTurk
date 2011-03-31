@@ -49,8 +49,6 @@ begin
   btnLeave.Enabled:= false;
   Client:= nil;
   cbChooseClass.Items.AddObject(TUIClient.ClassName       +'     '+TUIClient.ClientName, TObject(TUIClient));
-  cbChooseClass.Items.AddObject(TUIClient2WithAI.ClassName+'     '+TUIClient2WithAI.ClientName, TObject(TUIClient2WithAI));
-  cbChooseClass.Items.AddObject(TUIClientWithAI.ClassName +'     '+TUIClientWithAI.ClientName, TObject(TUIClientWithAI));
 end;
 
 procedure TBKIMain.btnConnectClick(Sender: TObject);

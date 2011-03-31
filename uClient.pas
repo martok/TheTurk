@@ -51,7 +51,6 @@ type
     procedure NextMove; override;
     procedure AfterMove(FieldFrom: TFieldCoord; FieldTo: TFieldCoord; MovingPlayer: TField); override;
     destructor Destroy; override;
-    
   end;
 
   TUIClient2WithAI = class(TUIClient)

@@ -32,8 +32,10 @@ type
   // Das Brett selbst kennt nur "ich" und "der andere", die Farbe ist eigentlich irrelevant
   TPlayerColor = (White, Black);
   TField = (Empty, Blocked, ThisPlayer, OtherPlayer);
+  // Indizes: [a..i,1..9]
   TColIndex = 'a'..'i';
   TRowIndex = 1..9;
+  // Darstellung als String, kann man direkt ausgeben: z.B. 'd5'
   TFieldCoord = String[2];
   TBoard = array[TColIndex, TRowIndex] of TField;
 
@@ -42,7 +44,7 @@ type
   {
      TNetGame
      Abstrakte Basisklasse für alle Spiel-Clients/Bots
-     Definiert das allgemeine Verhalten und einige funktionen, die in abgeleiten
+     Definiert das allgemeine Verhalten und einige Funktionen, die in abgeleiten
      Klassen überschrieben werden müssen.
   }
   TNetGame = class
@@ -50,7 +52,7 @@ type
     FOwner: TNetGameProtocol;
     FGameID: integer;
   protected
-    // Das aktuelle Brett. Indiziert a..i,1..9
+    // Das aktuelle Brett.
     Board: TBoard;
     // Meine Farbe, z.B. zum Zeichnen oder für Logs
     PlayerColor: TPlayerColor;
@@ -78,6 +80,7 @@ type
 
     // Zug ausführen. Meldet der Server einen Fehler, wird eine EProtocolException ausgelöst
     // Result: true wenn Gegner passen muss (= man direkt wieder dran ist)
+    //         Sinnvolle Vorgehensweise:   if Move(..) then NextMove;
     function Move(FieldFrom, FieldTo: TFieldCoord): boolean;
 
     {
@@ -89,7 +92,7 @@ type
     class function ClientName: string; virtual; abstract;
     // Result: Von der Spielleitung zugeteilter geheimer Schlüssel
     class function ClientSecret: string; virtual; abstract;
-    // Der nächste Zug ist nötig. Innerhalbt dieser Methode muss *genau einmal* .Move auferufen werden.
+    // Der nächste Zug ist nötig. Innerhalb dieser Methode muss *genau einmal* .Move auferufen werden.
     procedure NextMove; virtual; abstract;
     // Ein Zug wurde gemacht. Das Board hat jetzt schon den neuen Zustand
     // OPTIONAL, Standardverhalten: nichts.
@@ -106,6 +109,11 @@ type
     procedure GameEnd(RegularEnd, DidIWin: boolean); virtual; abstract;
   end;
 
+  {
+     TLPThread
+     Hilfsklasse für LongPolling. Führt getActionsLong für AOwner aus und
+     gibt ggf. Meldung an AOwner.ParseActions.
+  }
   TLPThread = class(TThread)
   private
     FPA: TNetGameProtocol;
@@ -119,7 +127,10 @@ type
     procedure EndMe;
   end;
 
-  // Allgemeine Informationen über verfügbare Spiele
+  {
+     TReplayHeader
+     Allgemeine Informationen über verfügbare Spiele
+  }
   TReplayHeader = record
     // Unter welcher ID ist das Spiel gelaufen
     GameID: integer;
@@ -131,8 +142,11 @@ type
   end;
   TReplayList = array of TReplayHeader;
 
-  // Ein Zug in einem Spiel.
-  //   Ist das ein Aussetzen-'Zug', ist DateTime=0 und FieldFrom=FieldTo=''
+  {
+     TReplayMove
+     Ein Zug in einem Spiel.
+     Ist das ein Aussetzen-'Zug', ist DateTime=0 und FieldFrom=FieldTo=''
+  }
   TReplayMove = record
     // Wann wurde der Zug gemacht?
     DateTime: TDateTime;
@@ -145,6 +159,11 @@ type
   // gemacht hat, Index 1 der erste von Weiß
   TReplayGame = array of TReplayMove;
 
+  {
+     TNetGameProtocol
+     Der Protokoll-Adapter. Hier passiert die komplette Kommunikation mit dem
+     Server.
+  }
   TNetGameProtocol = class
   private
     http: TIdHTTP;
@@ -165,16 +184,16 @@ type
     destructor Destroy; override;
 
     // Ohne Session möglich: Replays abfragen
-    // Zum Datenformat siehe Kommentare in den TReplay*-Typen
+    // Zum Datenformat siehe Kommentare zu den TReplay*-Typen
     procedure GetReplayList(out Listing: TReplayList);
     procedure GetReplayGameData(GameID: integer; out Game: TReplayGame);
 
     // Session eröffnen. Darf nur einmal aufgerufen werden.
     //   AGameClass: Zu verwendende Client-Klasse
     procedure CreateSession(AGameClass: TNetGameClass);
-    // Session eröffnen. Darf nur einmal aufgerufen werden.
-    // !!!! Kein weiterer irgendeiner Funktion danach möglich, alle Referenzen
-    //         auf Spiele-Instanzen werden hierdurch ungültig             !!!!
+    // Session beenden. Darf nur einmal aufgerufen werden.
+    // !!!! Kein weiterer Aufruf irgendeiner Funktion danach möglich, alle 
+    //      Referenzen auf Spiele-Instanzen werden hierdurch ungültig       !!!!
     procedure EndSession;
     property SessionId: string read FSessionId;
 
@@ -198,6 +217,36 @@ type
     function StartGame(PartnerSN: Integer): TNetGame;
   end;
 
+resourcestring
+  errIncompatibleServer = 'Abgebrochen: Serverversion ist nicht kompatibel (%d, erwartet: %d)';
+  errUnknownGame        = 'Unbekanntes Spiel: %d';
+  errUnknownPlayerColor = 'Unbekannte Farbe: %s';
+  errUnknownBoolChar    = 'Unbekannter Wahrheitswert: %s';
+
+  
+// Diese Routinen benutzen einiges an Typecasts, um teuere StrToInt/IntToStr zu sparen
+// Ich hab überall AnsiChar geschrieben, aber schlagt mich nicht wenn etwas durchgerutscht ist ;-)
+function FieldCoordToColRow(const Field: TFieldCoord; out Col: TColIndex; out Row: TRowIndex): boolean;
+// Numeric ist Null-basiert
+function FieldCoordToNumeric(const Field: TFieldCoord; out Col, Row: byte): boolean;
+function ColRowToFieldCoord(const Col: TColIndex; const Row: TRowIndex): TFieldCoord;
+function NumericToFieldCoord(const Col, Row: byte): TFieldCoord;
+
+// Wie weit sind diese Felder auseinander? (Chebyshev-Distanz)
+function BoardDistance(FieldFrom, FieldTo: TFieldCoord): integer;
+// gülitge Koordinaten? (Prüfung nach Datentyp-Definition)
+function BoardValidCoords(C: TColIndex; R: TRowIndex): boolean;
+// Führt einen Zug auf einem Board aus. ACHTUNG: es wird angenommen, dass Pl wirklich auf F steht
+procedure BoardMapMove(var Board: TBoard; F, T: TFieldCoord; Pl: TField);
+// Initialisiert das Brett für eine bestimmte Perspektive
+procedure BoardMapInit(var Board: TBoard; Black, White: TField);
+
+
+implementation
+
+uses Math, DateUtils;
+
+// Befehle
 const
   cmd_startSession = '%s?mode=startSession&secret=%s&client=%s';
   cmd_endSession   = '%s?mode=endSession&session=%s';
@@ -210,32 +259,7 @@ const
   cmd_listReplays  = '%s?mode=listReplays';
   cmd_getReplay    = '%s?mode=getReplay&game=%d';
 
-  errIncompatibleServer = 'Abgebrochen: Serverversion ist nicht kompatibel (%d, erwartet: %d)';
-  errUnknownGame        = 'Unbekanntes Spiel: %d';
-  errUnknownPlayerColor = 'Unbekannte Farbe: %s';
-  errUnknownBoolChar    = 'Unbekannter Wahrheitswert: %s';
-
-  
-// Diese Routinen benutzen einiges an Typecasts, um teuere StrToInt/IntToStr zu sparen
-function FieldCoordToColRow(const Field: TFieldCoord; out Col: TColIndex; out Row: TRowIndex): boolean;
-function FieldCoordToNumeric(const Field: TFieldCoord; out Col, Row: byte): boolean;
-function ColRowToFieldCoord(const Col: TColIndex; const Row: TRowIndex): TFieldCoord;
-function NumericToFieldCoord(const Col, Row: byte): TFieldCoord;
-
-// Wie weit sind diese Felder auseinander? (Chebyshev-Distanz)
-function BoardDistance(FieldFrom, FieldTo: TFieldCoord): integer;
-// gülitge Koordinaten? (Prüfung nach Datentyp)
-function BoardValidCoords(C: TColIndex; R: TRowIndex): boolean;
-// Führt einen Zug auf einem Board aus. ACHTUNG: es wird angenommen, dass Pl wirklich auf F steht
-procedure BoardMapMove(var Board: TBoard; F, T: TFieldCoord; Pl: TField);
-// Initialisiert das Brett für eine bestimmte Perspektive
-procedure BoardMapInit(var Board: TBoard; Black, White: TField);
-
-
-implementation
-
-uses Math, DateUtils;
-
+// Helper: String an Delim aufteilen und TStringList erzeugen
 function SplitString(S:String; Delim: char): TStringList;
 begin
   Result:= TStringList.Create;
@@ -243,6 +267,7 @@ begin
   Result.DelimitedText:= S;
 end;
 
+// Helper: Ausschnitt aus TStringList herauskopieren. First/Last inklusive
 function SubList(Source: TStringList; First, Last: integer): TStringList;
 var i:integer;
 begin
@@ -265,6 +290,7 @@ begin
                           0);
 end;
 
+// Prüfen ob ein Error vorlag und ggf Exception auslösen
 procedure HandleErrorResult(ResultString: String);
 begin
   if Copy(ResultString,1,4)='ERR:' then
@@ -390,8 +416,6 @@ begin
   Board['a',9]:= Black;
   Board['i',1]:= Black;
 end;
-
-
 
 
 { TNetGameProtocol }

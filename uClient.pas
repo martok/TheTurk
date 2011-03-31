@@ -55,18 +55,20 @@ implementation
 
 {$R *.dfm}
 
-{$I ClientSecret.inc.pas}
-
 { TUIClient }
 
 class function TUIClient.ClientName: String;
 begin
-  Result:= 'MartokUIClient';
+  Result:= 'SomeWeirdClientName';
+  raise Exception.Create('DEMO ONLY');
+  // Aber ihr dürft gerne euren eigenen Namen eintragen ;)
 end;
 
 class function TUIClient.ClientSecret: String;
 begin
-  Result:= ClientSecret_MartokUIClient;
+  Result:= 'notevertellingya';
+  raise Exception.Create('DEMO ONLY');
+  // Aber ihr dürft gerne euer eigenes Secret eintragen ;)
 end;
 
 procedure TUIClient.GameEnd(RegularEnd, DidIWin: Boolean);

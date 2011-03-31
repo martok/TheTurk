@@ -33,11 +33,21 @@ type
   end;
 
 type
+  {
+     TUIClient
+     Hier gehts los: Unser Bot! Und da es kein Bot ist, heißt er UIClient.
+  }
   TUIClient = class(TNetGame)
   private
+    // Das Statusfenster AKA unser GUI.
+    // Ja, ich werde da direkt drauf zugreifen. Kein guter Stil, aber dadurch
+    // sieht man alles was passiert direkt im Bot-Code ;-)
     FStatusWindow: TGameWindow;
     procedure DrawBoard;
   public
+    // Alles was man überschreiben muss
+    // Wir nehmen auch die Optionalen, um ein Log schreiben zu können und das UI
+    // passend zu aktualisieren
     class function ClientName: String; override;
     class function ClientSecret: String; override;
     procedure GameStart; override;
@@ -110,6 +120,8 @@ begin
   FStatusWindow.pnMakeMove.Visible:= true;
   FStatusWindow.edMvFrom.Text:= '';
   FStatusWindow.edMvTo.Text:= '';
+  // Hier warten wir jetzt auf User-Interaktion, die sich dann in Button1Click
+  // niederschlagen wird.
 end;
 
 procedure TUIClient.AfterMove(FieldFrom, FieldTo: TFieldCoord; MovingPlayer: TField);
@@ -207,10 +219,10 @@ end;
 procedure TGameWindow.Button1Click(Sender: TObject);
 begin
   try
-    if Gm.Move(edMvFrom.Text,edMvTo.Text) then
-      Gm.NextMove
+    if Gm.Move(edMvFrom.Text,edMvTo.Text) then    // Zug ausführen
+      Gm.NextMove                                 // gleich nochmal oder...
     else
-      pnMakeMove.Visible:= false;
+      pnMakeMove.Visible:= false;                 // ... erstmal fertig
   except
     edMvFrom.Text:= '';
     edMvTo.Text:= '';

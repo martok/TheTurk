@@ -181,7 +181,13 @@ type
     // auf auszuführende Aktionen pollen und ggf. an Spielinstanzen weiterleiten
     procedure GetActions;
 
-    // LongPolling-Thread starten
+    // LongPolling-Thread starten. Durch die verwendeten Indys ist das nicht
+    // unbedingt eine tolle Idee, da diese einen Aufruf nicht unfallfrei abbrechen
+    // können.
+    // Soll es trotzdem verwendet werden, sollte in den Debugger-Optionen die
+    // Exception EIdNotConnected ignoriert werden. Sie wird im Code korrekt
+    // abgefangen, aber das ändert nichts daran dass Delphi sich im Debug-Modus
+    // immer an dieser Stelle einschalten wird. 
     procedure EnableActionLoop;
     procedure DisableActionLoop;
     // Holt die Liste der Clients
@@ -658,6 +664,8 @@ begin
       try
         FResult:= http.Get(format(cmd_getActionsLong,[FPA.FBaseURL, FPA.FSessionId]));
       except
+        on E: EIdNotConnected do ;
+        else raise;
       end;
       if Assigned(FPA) then
         Synchronize(SyncCallback);

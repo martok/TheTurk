@@ -65,7 +65,6 @@ begin
     Client.CreateSession(c);
     Logger.Lines.Add('Session erzeugt: '+Client.SessionId);
     tmrClockTimer(Self);
-    Client.EnableActionLoop;
 
     btnConnect.Enabled:= false;
     cbChooseClass.Enabled:= false;
@@ -78,7 +77,6 @@ end;
 
 procedure TBKIMain.btnLeaveClick(Sender: TObject);
 begin
-  Client.DisableActionLoop;
   Client.EndSession;
   Logger.Lines.Add('Session beendet');
   FreeAndNil(Client);
@@ -101,8 +99,8 @@ begin
     Client.GetClientList(lbClientList.Items);
     for i:= 0 to lbClientList.Items.Count-1 do
       lbClientList.Items[i]:= IntToStr(Integer(lbClientList.Items.Objects[i]))+'  '+lbClientList.Items[i];
-//    Logger.Lines.Add('Warte auf Actions...');
-//    Client.GetActions;
+    Logger.Lines.Add('Hole Actions...');
+    Client.GetActions;
   end;
 end;
 

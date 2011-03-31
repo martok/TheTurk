@@ -70,8 +70,6 @@ implementation
 class function TUIClient.ClientName: String;
 begin
   Result:= 'SomeWeirdClientName';
-  raise Exception.Create('DEMO ONLY');
-  // Aber ihr dürft gerne euren eigenen Namen eintragen ;)
 end;
 
 class function TUIClient.ClientSecret: String;

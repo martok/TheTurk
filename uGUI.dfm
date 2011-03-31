@@ -58,7 +58,7 @@ object BKIMain: TBKIMain
       Width = 337
       Height = 21
       TabOrder = 0
-      Text = 'http://www.entwickler-ecke.de/ags2011_loa_reversi/reversi.php'
+      Text = 'http://www.entwickler-ecke.de/nusski/nuss.php'
     end
     object btnConnect: TButton
       Left = 440

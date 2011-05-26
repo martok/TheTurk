@@ -22,12 +22,15 @@ type
     Label4: TLabel;
     Label5: TLabel;
     cbChooseClass: TComboBox;
+    seThinkTime: TSpinEdit;
+    Label2: TLabel;
     procedure FormCreate(Sender: TObject);
     procedure btnConnectClick(Sender: TObject);
     procedure btnLeaveClick(Sender: TObject);
     procedure seClockChange(Sender: TObject);
     procedure tmrClockTimer(Sender: TObject);
     procedure lbClientListDblClick(Sender: TObject);
+    procedure seThinkTimeChange(Sender: TObject);
   private
     { Private-Deklarationen }
     Client: TNetGameProtocol;
@@ -114,6 +117,11 @@ begin
     if MessageDlg('Spiel gegen '+c+' starten?', mtConfirmation, [mbYes, mbNo], 0)=mrYes then
       Logger.Lines.Add('Spiel initiiert: '+IntToStr(Client.StartGame(psn).ID));
   end;
+end;
+
+procedure TBKIMain.seThinkTimeChange(Sender: TObject);
+begin
+  uClient.ThinkTime:= seThinkTime.Value*1000;
 end;
 
 end.

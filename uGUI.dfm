@@ -52,13 +52,20 @@ object BKIMain: TBKIMain
       Height = 13
       Caption = 'sec'
     end
+    object Label2: TLabel
+      Left = 349
+      Top = 36
+      Width = 17
+      Height = 13
+      Caption = 'sec'
+    end
     object edHostURL: TEdit
       Left = 100
       Top = 4
       Width = 337
       Height = 21
       TabOrder = 0
-      Text = 'http://www.entwickler-ecke.de/ags2011_loa_reversi/reversi.php'
+      Text = 'http://www.entwickler-ecke.de/nusski/nuss.php'
     end
     object btnConnect: TButton
       Left = 440
@@ -97,6 +104,17 @@ object BKIMain: TBKIMain
       Style = csDropDownList
       ItemHeight = 13
       TabOrder = 4
+    end
+    object seThinkTime: TSpinEdit
+      Left = 285
+      Top = 31
+      Width = 57
+      Height = 22
+      MaxValue = 60
+      MinValue = 1
+      TabOrder = 5
+      Value = 5
+      OnChange = seThinkTimeChange
     end
   end
   object Panel2: TPanel

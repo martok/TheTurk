@@ -5,7 +5,7 @@ object GameWindow: TGameWindow
   BorderStyle = bsSingle
   Caption = 'GameWindow'
   ClientHeight = 364
-  ClientWidth = 424
+  ClientWidth = 526
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -20,7 +20,7 @@ object GameWindow: TGameWindow
   object sgBoard: TStringGrid
     Left = 0
     Top = 21
-    Width = 306
+    Width = 304
     Height = 308
     Align = alClient
     ColCount = 9
@@ -34,21 +34,22 @@ object GameWindow: TGameWindow
     OnSelectCell = sgBoardSelectCell
   end
   object meLog: TMemo
-    Left = 306
+    Left = 304
     Top = 21
-    Width = 118
+    Width = 222
     Height = 308
     Align = alRight
     Lines.Strings = (
       'meLog')
     ReadOnly = True
-    ScrollBars = ssVertical
+    ScrollBars = ssBoth
     TabOrder = 1
+    WordWrap = False
   end
   object Panel1: TPanel
     Left = 0
     Top = 0
-    Width = 424
+    Width = 526
     Height = 21
     Align = alTop
     BevelOuter = bvNone
@@ -63,7 +64,7 @@ object GameWindow: TGameWindow
   object pnMakeMove: TPanel
     Left = 0
     Top = 329
-    Width = 424
+    Width = 526
     Height = 35
     Align = alBottom
     BevelOuter = bvNone

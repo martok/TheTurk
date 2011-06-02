@@ -51,9 +51,8 @@ begin
   cbChooseClass.Enabled:= true;
   btnLeave.Enabled:= false;
   Client:= nil;
-  cbChooseClass.Items.AddObject(TUIClient.ClassName       +'     '+TUIClient.ClientName, TObject(TUIClient));
-  cbChooseClass.Items.AddObject(TUIClient2WithAI.ClassName+'     '+TUIClient2WithAI.ClientName, TObject(TUIClient2WithAI));
-  cbChooseClass.Items.AddObject(TUIClientWithAI.ClassName +'     '+TUIClientWithAI.ClientName, TObject(TUIClientWithAI));
+  cbChooseClass.Items.AddObject(TUIClient.ClassName +'     '+TUIClient.ClientName, TObject(TUIClient));
+  cbChooseClass.Items.AddObject(TTurk.ClassName+'     '+TTurk.ClientName, TObject(TTurk));
 end;
 
 procedure TBKIMain.btnConnectClick(Sender: TObject);

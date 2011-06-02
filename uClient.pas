@@ -63,17 +63,13 @@ type
     destructor Destroy; override;
   end;
 
-  TUIClient2WithAI = class(TUIClient)
+  TTurk = class(TUIClient)
   public
     class function ClientName: String; override;
+    class function ClientSecret: String; override;
     procedure NextMove; override;
 
     function AIGetMove(out FF,FT: TFieldCoord): TScore;
-  end;
-
-  TUIClientWithAI = class(TUIClient2WithAI)
-  public
-    class function ClientName: String; override;
   end;
 
 var
@@ -180,13 +176,6 @@ begin
   inherited;
 end;
 
-{ TUIClient2 }
-
-class function TUIClient2WithAI.ClientName: String;
-begin
-  Result:= 'MartokUIClient2';
-end;
-
 { TGameWindow }
 
 procedure TGameWindow.sgBoardDrawCell(Sender: TObject; ACol, ARow: Integer;
@@ -267,7 +256,7 @@ end;
 ///   AI RELATED STUFF BELOW THIS LINE
 /// ----------------------------------------------------------------------------
 
-procedure TUIClient2WithAI.NextMove;
+procedure TTurk.NextMove;
 begin
   inherited;
   PostMessage(FStatusWindow.Handle,WM_USER+100,0,0);
@@ -488,32 +477,34 @@ end;
 
 //------------
 
-function TUIClient2WithAI.AIGetMove(out FF, FT: TFieldCoord): TScore;
-var turk: TThinker;
+class function TTurk.ClientName: String;
 begin
-  turk.Board:= Board;
-  turk.Init(ThinkTime);
-  TMethod(turk.Log).Code:= Addr(TStrings.Add);
-  TMethod(turk.Log).Data:= FStatusWindow.meLog.Lines;
+  Result:= 'TheTurk';
+end;
 
-  Result:= turk.FindMove(FF,FT);
+class function TTurk.ClientSecret: String;
+begin
+  Result:= ClientSecret_TheTurk;
+end;
+
+function TTurk.AIGetMove(out FF, FT: TFieldCoord): TScore;
+var Brain: TThinker;
+begin
+  Brain.Board:= Board;
+  Brain.Init(ThinkTime);
+  TMethod(Brain.Log).Code:= Addr(TStrings.Add);
+  TMethod(Brain.Log).Data:= FStatusWindow.meLog.Lines;
+
+  Result:= Brain.FindMove(FF,FT);
 end;
 
 procedure TGameWindow.Magic;
 var f,t: TFieldCoord;
 begin
-  TUIClient2WithAI(Gm).AIGetMove(f,t);
+  TTurk(Gm).AIGetMove(f,t);
   edMvFrom.Text:= f;
   edMvTo.Text:= t;
   Button1.Click;
 end;
-
-{ TUIClientWithAI }
-
-class function TUIClientWithAI.ClientName: String;
-begin
-  Result:= 'MartokUIClient';
-end;
-
 
 end.

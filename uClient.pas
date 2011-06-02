@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, uProtocol, Grids, StdCtrls, ExtCtrls;
+  Dialogs, uProtocol, Grids, StdCtrls, ExtCtrls, DUStrings;
 
 type
   TGameWindow = class(TForm)
@@ -273,45 +273,120 @@ begin
   PostMessage(FStatusWindow.Handle,WM_USER+100,0,0);
 end;
 
-function TUIClient2WithAI.AIGetMove(out FF, FT: TFieldCoord): TScore;
-  function CheckTimeEnd: boolean; forward;
-var
-  NM_Move_calls,
-  Zugliste_gen: integer;
-  function NM_Move(Moving, Reacting: TField; ABoard: TBoard; Level: integer; Alpha, Beta: TScore;
-                   out BestF,BestT: TFieldCoord): TScore;
-  var
-    FreeOnBoard: integer;
+const
+  E_TIMEOUT = SCORE_MIN - 1;
+
+type
+  TThinker = object
+  private
+    Board: TBoard;
+    HadTimeout: boolean;
+    _FreeOnBoard: integer;
+    _Timeout: dword;
+    _TSt: dword;
+
+    StatMoves,
+    StatCutoff,
+    StatScored: int64;
+    Log: procedure (Line: string) of object;
+    procedure Init(Timeout: integer);
+    function CheckTimeEnd: boolean;
     function Score(ABoard: TBoard; Perspective: TField): TScore;
-    var r: TRowIndex;
-        c: TColIndex;
-        th,ot: integer;
-    const
-      w1 = 20*100;
-      w2 = 1000;
-      w3 =  900;
+    function NM_Move(Moving, Reacting: TField; ABoard: TBoard; Level: integer; Alpha, Beta: TScore;
+                   out BestF,BestT: TFieldCoord): TScore;
+    function FindMove(out BestF,BestT: TFieldCoord): TScore;
+  end;
+
+{ TThinker }
+
+procedure TThinker.Init(Timeout: integer);
+var r: TRowIndex;
+    c: TColIndex;
+begin
+  _Timeout:= Timeout;
+  _FreeOnBoard:= 0;
+  for r:= low(r) to high(r) do
+    for c:= low(c) to high(c) do
+      if Board[c,r]<>Blocked then
+        inc(_FreeOnBoard);
+end;
+
+function TThinker.FindMove(out BestF, BestT: TFieldCoord): TScore;
+var ld: integer;
+    bf,bt: TFieldCoord;
+    sc: TScore;
+begin
+  Result:= SCORE_MIN;
+  ld:= 2;
+  _TSt:= GetTickCount;
+  repeat
+    inc(ld);
+    HadTimeout:= false;
+    StatMoves := 0;
+    StatCutoff:= 0;
+    StatScored:= 0;
+    sc:= NM_Move(ThisPlayer, OtherPlayer, Board, ld, SCORE_MIN, SCORE_MAX, bf, bt);
+    if not HadTimeout then begin
+      Log(Format('  L:%d M:%d C:%d S:%d %d ms',[ld, StatMoves, StatCutoff, StatScored, GetTickCount - _TSt]));
+      Log(Format('    Best: %s %s - %d',[bf,bt,sc]));
+      Result:= sc;
+      BestF:= bf;
+      BestT:= bt;
+    end else begin
+      Log(Format('  L:%d  Timed out', [ld]));
+      break;
+    end;
+  until CheckTimeEnd;
+  Log(Format(' -> %d (%s %s) @ %d, %dms',[Result, BestF, BestT, ld, GetTickCount - _TSt]));
+end;
+
+function TThinker.CheckTimeEnd: boolean;
+begin
+  Result:= (GetTickCount > _TSt + _Timeout);
+end;
+
+function TThinker.NM_Move(Moving, Reacting: TField; ABoard: TBoard; Level: integer; Alpha, Beta: TScore; out BestF, BestT: TFieldCoord): TScore;
+var r: TRowIndex;
+    c: TColIndex;
+    zug, z: integer;
+    zugliste: array[0..200] of packed record
+        einzel: boolean;
+        FR: TRowIndex; FC: TColIndex;
+        TR: TRowIndex; TC: TColIndex;
+      end;
+    procedure ZugAdd(ac: TColIndex; ar: TRowIndex);
     begin
-      th:= 0;
-      ot:= 0;
-      for r:= low(r) to high(r) do
-        for c:= low(c) to high(c) do begin
-          if ABoard[c,r]=Perspective then
-            inc(th)
-          else if ABoard[c,r] in [ThisPlayer,OtherPlayer] then      // a clever way to say "player, but not $perspective"
-            inc(ot);
-        end;
-      Result:= Round((th / FreeOnBoard)*w2) - Round((ot / FreeOnBoard)*w3);
+                                   // inlined BoardValidCoords
+      if (ABoard[ac,ar]=Empty) and ((ar in [low(ar)..high(ar)]) and (ac in [low(ac)..high(ac)])) then begin
+        zugliste[zug].FC:= c;
+        zugliste[zug].FR:= r;
+        zugliste[zug].TC:= ac;
+        zugliste[zug].TR:= ar;
+        inc(zug);
+        inc(StatMoves);
+      end;
     end;
 
+    procedure ZugEinzelAdd(ac: TColIndex; ar: TRowIndex);
+    var k:integer;
+    begin
+      for k:= 0 to zug-1 do
+        if (zugliste[k].einzel) and (zugliste[k].TC = ac) and (zugliste[k].TR = ar) then
+          exit;
+      //sonst
+      zugliste[zug].einzel:= true;
+      ZugAdd(ac,ar);
+    end;
 
-    function TryMove(fc: TColIndex; fr: TRowIndex; tc: TColIndex; tr: TRowIndex): boolean;
+    function TryMove(fc: TColIndex; fr: TRowIndex; tc: TColIndex;
+      tr: TRowIndex): boolean;
     var after: TBoard;
         df,dt: TFieldCoord;
         S: TScore;
     begin
       Result:= false;
       after:= ABoard;
-      BoardMapMove(after,ColRowToFieldCoord(fc,fr),ColRowToFieldCoord(tc,tr),Moving);
+      BoardMapMove(after,ColRowToFieldCoord(fc,fr),ColRowToFieldCoord(tc,tr));
 
       S:= -NM_Move(Reacting, Moving, after, Level - 1, -beta, -alpha, df,dt);
 
@@ -320,140 +395,108 @@ var
         BestF:= ColRowToFieldCoord(fc,fr);
         BestT:= ColRowToFieldCoord(tc,tr);
       end;
-      if alpha >= beta then 
+      if alpha >= beta then begin
         Result:= true;
-    end;
-
-  var r: TRowIndex;
-      c: TColIndex;
-      zug: integer;
-      listswitch: boolean;
-      zugliste: array[boolean,0..100] of packed record
-          FR: TRowIndex; FC: TColIndex;
-          TR: TRowIndex; TC: TColIndex;
-        end;
-      procedure ZugAdd(ac: TColIndex; ar: TRowIndex);
-      begin
-                                     // inlined BoardValidCoords
-        if (ABoard[ac,ar]=Empty) and ((ar in [low(ar)..high(ar)]) and (ac in [low(ac)..high(ac)])) then begin
-          zugliste[listswitch][zug].FC:= c;
-          zugliste[listswitch][zug].FR:= r;
-          zugliste[listswitch][zug].TC:= ac;
-          zugliste[listswitch][zug].TR:= ar;
-          inc(zug);
-          inc(Zugliste_gen);
-        end;
+        inc(StatCutoff);
       end;
-
-      procedure ZugEinzelAdd(ac: TColIndex; ar: TRowIndex);
-      var k:integer;
-      begin
-        for k:= 0 to zug-1 do
-          if (zugliste[listswitch][k].TC = ac) and (zugliste[listswitch][k].TR = ar) then
-            exit;
-        //sonst
-        ZugAdd(ac,ar);
-      end;
-
-  begin
-    inc(NM_Move_calls);
-    FreeOnBoard:= 0;
-    for r:= low(r) to high(r) do
-      for c:= low(c) to high(c) do
-        if ABoard[c,r]<>Blocked then
-          inc(FreeOnBoard);
-
-    if Level=0 then begin
-      Result:= Score(ABoard, Moving);
-      exit;
     end;
 
-    if (Level>=6) and CheckTimeEnd then begin
-      Result:= Score(ABoard, Moving);
-      FStatusWindow.meLog.Lines.Add(Format(' Timeout on level %d',[Level]));
-      exit;
-    end;
-
-    ZeroMemory(@zugliste, Sizeof(Zugliste));
-
-    // Doppelzüge
-      zug:= 0;
-      listswitch:= true;
-      for r:= low(R) to high(r) do
-        for c:= low(c) to high(c) do
-          if ABoard[c,r]=Moving then begin
-            ZugAdd(pred(pred(c)),r-2);
-            ZugAdd(pred(pred(c)),r);
-            ZugAdd(pred(pred(c)),r+2);
-            ZugAdd(succ(succ(c)),r-2);
-            ZugAdd(succ(succ(c)),r);
-            ZugAdd(succ(succ(c)),r+2);
-            ZugAdd(c,r-2);
-            ZugAdd(c,r+2);
-          end;
-      Zugliste[listswitch][zug].FR:= TRowIndex(0);
-
-    // Einzelzüge
-      zug:= 0;
-      listswitch:= false;
-      for r:= low(R) to high(r) do
-        for c:= low(c) to high(c) do
-          if ABoard[c,r]=Moving then begin
-            ZugEinzelAdd(pred(c),r-1);
-            ZugEinzelAdd(pred(c),r);
-            ZugEinzelAdd(pred(c),r+1);
-            ZugEinzelAdd(succ(c),r-1);
-            ZugEinzelAdd(succ(c),r);
-            ZugEinzelAdd(succ(c),r+1);
-            ZugEinzelAdd(c,r-1);
-            ZugEinzelAdd(c,r+1);
-          end;
-      Zugliste[listswitch][zug].FR:= TRowIndex(0);
-
-    for listswitch:= low(boolean) to high(boolean) do
-      for zug:= 0 to high(zugliste[listswitch]) do
-        if zugliste[listswitch][zug].FR>0 then begin
-          if TryMove(zugliste[listswitch][zug].FC,zugliste[listswitch][zug].FR,
-                     zugliste[listswitch][zug].TC,zugliste[listswitch][zug].TR) then begin
-            Result:= alpha;
-            exit;
-          end;
-        end else
-          break;
-
-    if Alpha=SCORE_MIN then           // wir konnten keinen zug machen
-//      Result:= SCORE_MIN+Random(10)   // "leap of faith"
-      Result:= Score(ABoard, Moving)  // bewerten, sollte ziemlich schlecht sein
-    else
-      Result:= Alpha;
-  end;
-
-var t_st: dword;
-    ld: integer;
-    bf,bt: TFieldCoord;
-    sc: TScore;
-
-  function CheckTimeEnd: boolean;
-  begin
-    Result:= (GetTickCount > t_st + ThinkTime);
-  end;
 begin
-  Result:= SCORE_MIN;
-  ld:= 2;
-  t_st:= GetTickCount;
-  repeat
-    inc(ld);
-    NM_Move_calls:= 0;
-    Zugliste_gen:= 0;
-    sc:= NM_Move(ThisPlayer, OtherPlayer, Board, ld, SCORE_MIN, SCORE_MAX, bf, bt);
-    FStatusWindow.meLog.Lines.Add(Format('  %d: N: %d Z: %d',[ld, NM_Move_calls,Zugliste_gen]));
-    if sc > Result then begin
-      Result:= sc;
-      FF:= bf;
-      FT:= bt;
+  Result:= E_TIMEOUT;
+  if Level=0 then begin
+    Result:= Score(ABoard, Moving);
+    exit;
+  end;
+
+  if (Level>=6) and CheckTimeEnd then begin
+    HadTimeout:= true;
+    exit;
+  end;
+
+  ZeroMemory(@zugliste, Sizeof(Zugliste));
+
+  zug:= 0;
+// Einzelzüge
+  for r:= low(R) to high(r) do
+    for c:= low(c) to high(c) do
+      if ABoard[c,r]=Moving then begin
+        ZugEinzelAdd(pred(c),r-1);
+        ZugEinzelAdd(pred(c),r);
+        ZugEinzelAdd(pred(c),r+1);
+        ZugEinzelAdd(succ(c),r-1);
+        ZugEinzelAdd(succ(c),r);
+        ZugEinzelAdd(succ(c),r+1);
+        ZugEinzelAdd(c,r-1);
+        ZugEinzelAdd(c,r+1);
+      end;
+
+// Doppelzüge
+  for r:= low(R) to high(r) do
+    for c:= low(c) to high(c) do
+      if ABoard[c,r]=Moving then begin
+        ZugAdd(pred(pred(c)),r-2);
+        ZugAdd(pred(pred(c)),r);
+        ZugAdd(pred(pred(c)),r+2);
+        ZugAdd(succ(succ(c)),r-2);
+        ZugAdd(succ(succ(c)),r);
+        ZugAdd(succ(succ(c)),r+2);
+        ZugAdd(c,r-2);
+        ZugAdd(c,r+2);
+      end;
+
+
+  for z:= 0 to zug-1 do
+    if zugliste[z].FR>0 then begin
+      if TryMove(zugliste[z].FC,zugliste[z].FR,
+                 zugliste[z].TC,zugliste[z].TR) then begin
+        Result:= alpha;
+        exit;
+      end;
+      if HadTimeout then
+        exit;
+    end else
+      break;
+
+  if Alpha=SCORE_MIN then           // wir konnten keinen zug machen
+//      Result:= SCORE_MIN+Random(10)   // "leap of faith"
+    Result:= Score(ABoard, Moving)  // bewerten, sollte ziemlich schlecht sein
+  else
+    Result:= Alpha;
+end;
+
+function TThinker.Score(ABoard: TBoard; Perspective: TField): TScore;
+var r: TRowIndex;
+    c: TColIndex;
+    th,ot: integer;
+const
+  w1 = 20*100;
+  w2 = 1000;
+  w3 =  900;
+begin
+  th:= 0;
+  ot:= 0;
+  for r:= low(r) to high(r) do
+    for c:= low(c) to high(c) do begin
+      if ABoard[c,r]=Perspective then
+        inc(th)
+      else if ABoard[c,r] in [ThisPlayer,OtherPlayer] then      // a clever way to say "player, but not $perspective"
+        inc(ot);
     end;
-  until CheckTimeEnd;
-  FStatusWindow.meLog.Lines.Add(Format(' -> %d @ %d, %dms',[Result, ld, GetTickCount - t_st]));
+  Result:= Round((th / _FreeOnBoard)*w2) - Round((ot / _FreeOnBoard)*w3);
+  inc(StatScored);
+end;
+
+//------------
+
+function TUIClient2WithAI.AIGetMove(out FF, FT: TFieldCoord): TScore;
+var turk: TThinker;
+begin
+  turk.Board:= Board;
+  turk.Init(ThinkTime);
+  TMethod(turk.Log).Code:= Addr(TStrings.Add);
+  TMethod(turk.Log).Data:= FStatusWindow.meLog.Lines;
+
+  Result:= turk.FindMove(FF,FT);
 end;
 
 procedure TGameWindow.Magic;
@@ -471,5 +514,6 @@ class function TUIClientWithAI.ClientName: String;
 begin
   Result:= 'MartokUIClient';
 end;
+
 
 end.

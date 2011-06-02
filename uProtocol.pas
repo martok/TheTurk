@@ -239,7 +239,7 @@ function BoardDistance(FieldFrom, FieldTo: TFieldCoord): integer;
 // gülitge Koordinaten? (Prüfung nach Datentyp-Definition)
 function BoardValidCoords(C: TColIndex; R: TRowIndex): boolean;
 // Führt einen Zug auf einem Board aus. ACHTUNG: es wird angenommen, dass Pl wirklich auf F steht
-procedure BoardMapMove(var Board: TBoard; F, T: TFieldCoord; Pl: TField);
+procedure BoardMapMove(var Board: TBoard; F, T: TFieldCoord);
 // Initialisiert das Brett für eine bestimmte Perspektive
 procedure BoardMapInit(var Board: TBoard; Black, White: TField);
 
@@ -372,9 +372,10 @@ begin
   Result:= (r in [low(r)..high(r)]) and (c in [low(c)..high(c)]);
 end;
 
-procedure BoardMapMove(var Board: TBoard; F, T: TFieldCoord; Pl: TField);
+procedure BoardMapMove(var Board: TBoard; F, T: TFieldCoord);
 var r: TRowIndex;
     c: TColIndex;
+    Pl: TField;
   procedure ConvertAt(cc: TColIndex; rr: TRowIndex);
   begin
     if (rr in [low(r)..high(r)]) then begin
@@ -384,6 +385,15 @@ var r: TRowIndex;
   end;
 
 begin
+  FieldCoordToColRow(F,c,r);
+  Pl:= Board[c,r];
+
+  // muss der alte weg?
+  // 1 Feld: kopiert
+  // 2 Felder: verschoben
+  if BoardDistance(F, T)=2 then
+    Board[c,r]:= Empty;
+
   FieldCoordToColRow(T,c,r);
   Board[c,r]:= Pl;
 
@@ -401,14 +411,6 @@ begin
   end;
   ConvertAt(c,pred(r));
   ConvertAt(c,succ(r));
-
-  // muss der alte weg?
-  // 1 Feld: kopiert
-  // 2 Felder: verschoben
-  if BoardDistance(F, T)=2 then begin
-    FieldCoordToColRow(F,c,r);
-    Board[c,r]:= Empty;
-  end;
 end;
 
 procedure BoardMapInit(var Board: TBoard; Black, White: TField);
@@ -780,7 +782,7 @@ end;
 
 procedure TNetGame.MapMove(F, T: TFieldCoord; Pl: TField);
 begin
-  BoardMapMove(Board, F,T,Pl);
+  BoardMapMove(Board, F,T);
   AfterMove(F,T,Pl);
 end;
 

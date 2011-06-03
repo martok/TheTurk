@@ -2,12 +2,23 @@ unit uClientLogic;
 
 interface
 
-uses Windows, SysUtils, uProtocol, uClient;
+uses Windows, SysUtils, Classes, uProtocol, uClient;
 
 const
   E_TIMEOUT = SCORE_MIN - 1;
 
 type
+  TTimeoutThread = class(TThread)
+  private
+    FFlag: PBoolean;
+    FTimeout: Cardinal;
+  protected
+    procedure Execute; override;
+  public
+    constructor Create(const Timeout: Cardinal; const TimeoutFlag: PBoolean); 
+    procedure StartWaiting;
+  end;
+
   TThinker = object
   private
     _FreeOnBoard: integer;
@@ -23,7 +34,6 @@ type
     StatScored: int64;
     Log: procedure (Line: string) of object;
     procedure Init(Timeout: integer);
-    function CheckTimeEnd: boolean;
     function Score(ABoard: TBoard; Perspective: TField): TScore;
     function NM_Move(Moving, Reacting: TField; ABoard: TBoard; Level: integer; Alpha, Beta: TScore;
                    out BestF,BestT: TFieldCoord): TScore;
@@ -50,34 +60,34 @@ function TThinker.FindMove(out BestF, BestT: TFieldCoord): TScore;
 var ld: integer;
     bf,bt: TFieldCoord;
     sc: TScore;
+    timer: TTimeoutThread;
 begin
   Result:= SCORE_MIN;
   ld:= 2;
   _TSt:= GetTickCount;
-  repeat
-    inc(ld);
-    HadTimeout:= false;
-    StatMoves := 0;
-    StatCutoff:= 0;
-    StatScored:= 0;
-    sc:= NM_Move(ThisPlayer, OtherPlayer, Board, ld, SCORE_MIN, SCORE_MAX, bf, bt);
-    if not HadTimeout then begin
-      Log(Format('  L:%d M:%d C:%d S:%d %d ms',[ld, StatMoves, StatCutoff, StatScored, GetTickCount - _TSt]));
-      Log(Format('    Best: %s %s : %d',[bf,bt,sc]));
-      Result:= sc;
-      BestF:= bf;
-      BestT:= bt;
-    end else begin
-      Log(Format('  L:%d  Timed out', [ld]));
-      break;
-    end;
-  until CheckTimeEnd;
+  HadTimeout:= false;
+  timer:= TTimeoutThread.Create(ThinkTime, @HadTimeout);
+  try
+    timer.StartWaiting;
+    repeat
+      inc(ld);
+      StatMoves := 0;
+      StatCutoff:= 0;
+      StatScored:= 0;
+      sc:= NM_Move(ThisPlayer, OtherPlayer, Board, ld, SCORE_MIN, SCORE_MAX, bf, bt);
+      if not HadTimeout then begin
+        Log(Format('  L:%d M:%d C:%d S:%d %d ms',[ld, StatMoves, StatCutoff, StatScored, GetTickCount - _TSt]));
+        Log(Format('    Best: %s %s : %d',[bf,bt,sc]));
+        Result:= sc;
+        BestF:= bf;
+        BestT:= bt;
+      end else
+        Log(Format('  L:%d  Timed out', [ld]));
+    until HadTimeout;
+  finally
+    FreeAndNil(timer);
+  end;
   Log(Format(' -> %d (%s %s) @ %d, %dms',[Result, BestF, BestT, ld, GetTickCount - _TSt]));
-end;
-
-function TThinker.CheckTimeEnd: boolean;
-begin
-  Result:= (GetTickCount > _TSt + _Timeout);
 end;
 
 function TThinker.NM_Move(Moving, Reacting: TField; ABoard: TBoard; Level: integer; Alpha, Beta: TScore; out BestF, BestT: TFieldCoord): TScore;
@@ -144,10 +154,8 @@ begin
     exit;
   end;
 
-  if (Level>=6) and CheckTimeEnd then begin
-    HadTimeout:= true;
+  if HadTimeout then
     exit;
-  end;
 
   ZeroMemory(@zugliste, Sizeof(Zugliste));
 
@@ -236,6 +244,28 @@ begin
 end;
 
 //------------
+
+{ TTimeoutThread }
+
+constructor TTimeoutThread.Create(const Timeout: Cardinal;
+  const TimeoutFlag: PBoolean);
+begin
+  inherited Create(true);
+  FFlag:= TimeoutFlag;
+  FTimeout:= Timeout;
+end;
+
+procedure TTimeoutThread.Execute;
+begin
+  Sleep(FTimeout);
+  FFlag^:= true;
+end;
+
+procedure TTimeoutThread.StartWaiting;
+begin
+  FFlag^:= false;
+  Resume;
+end;
 
 end.
  

@@ -24,6 +24,7 @@ type
     cbChooseClass: TComboBox;
     seThinkTime: TSpinEdit;
     Label2: TLabel;
+    Label3: TLabel;
     procedure FormCreate(Sender: TObject);
     procedure btnConnectClick(Sender: TObject);
     procedure btnLeaveClick(Sender: TObject);

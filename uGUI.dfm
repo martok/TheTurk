@@ -59,6 +59,13 @@ object BKIMain: TBKIMain
       Height = 13
       Caption = 'sec'
     end
+    object Label3: TLabel
+      Left = 224
+      Top = 36
+      Width = 56
+      Height = 13
+      Caption = 'Bedenkzeit:'
+    end
     object edHostURL: TEdit
       Left = 100
       Top = 4

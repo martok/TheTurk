@@ -1,4 +1,8 @@
 unit uClientLogic;
+// Just in case... that module really benefits from optimization
+{$OPTIMIZATION ON}
+{$RANGECHECKS OFF}
+{$OVERFLOWCHECKS OFF}
 
 interface
 

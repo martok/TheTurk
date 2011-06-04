@@ -280,8 +280,16 @@ var Brain: TThinker;
 begin
   Brain.Board:= Board;
   Brain.Init(ThinkTime);
-  Brain.ScoreFactors[1]:= 34;
-  Brain.ScoreFactors[2]:= 30;
+(*
+Bootcamp sagt:
+24 38      baut geschlossene flächen, sichere inseln
+ 30 43
+
+ 33 28      konvertiert
+Einzelwertung per DoppelDuell (Hin-Rückspiel). 24 38 hat alle 4 Spiele gewonnen
+*)
+  Brain.ScoreFactors[1]:= 24;
+  Brain.ScoreFactors[2]:= 38;
   TMethod(Brain.Log).Code:= Addr(TStrings.Add);
   TMethod(Brain.Log).Data:= FStatusWindow.meLog.Lines;
 

@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, uProtocol, Grids, StdCtrls, ExtCtrls, DUStrings;
+  Dialogs, uProtocol, Grids, StdCtrls, ExtCtrls;
 
 type
   TGameWindow = class(TForm)
